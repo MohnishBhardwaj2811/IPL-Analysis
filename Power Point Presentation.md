@@ -30,3 +30,4 @@
 
 ![Slide 11](https://raw.githubusercontent.com/MohnishBhardwaj2811/IPL-Analysis/main/IPL%20Data%20Analysis%20Power%20Point%20Presentation/Slide11.PNG)
 
+![Slide 12](https://raw.githubusercontent.com/MohnishBhardwaj2811/IPL-Analysis/main/IPL%20Data%20Analysis%20Power%20Point%20Presentation/Slide12.PNG)
