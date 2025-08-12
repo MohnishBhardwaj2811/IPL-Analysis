@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>LIVE Cricket TV Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- Icons -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+  <!-- Chart.js for small run-progress chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg: #071126;
+      --card: #0f2740;
+      --accent: #ff4d4f;
+      --muted: rgba(255,255,255,0.65);
+      --glass: rgba(255,255,255,0.03);
+      --neon: rgba(255,77,79,0.15);
+      --panel-gap: 16px;
+      font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      background: linear-gradient(180deg, #021026 0%, #041833 40%, #071126 100%);
+      color:#fff;
+      padding:20px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    /* Main container sized like a TV */
+    .tv {
+      width:1200px;
+      max-width:96vw;
+      border-radius:14px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.02);
+      padding:18px;
+      display:grid;
+      grid-template-columns: 1fr 420px;
+      gap: var(--panel-gap);
+    }
+
+    /* Left main area */
+    .main {
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    /* Top score header */
+    .scoreboard {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:18px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(0,0,0,0.04));
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .teams {
+      display:flex;
+      gap:18px;
+      align-items:center;
+    }
+    .team {
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .logo {
+      width:72px;
+      height:72px;
+      border-radius:8px;
+      background:var(--glass);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:700;
+      font-size:18px;
+      color:var(--muted);
+      border: 1px solid rgba(255,255,255,0.03);
+    }
+    .team .abbr {font-size:18px; font-weight:700; color:#fff}
+    .team .meta {font-size:14px; color:var(--muted)}
+    .score-big {
+      display:flex;
+      gap:18px;
+      align-items:center;
+    }
+    .runs {
+      font-size:64px;
+      font-weight:800;
+      line-height:1;
+      letter-spacing: -2px;
+      color: #fff;
+      text-shadow: 0 6px 18px rgba(0,0,0,0.6);
+    }
+    .overs {
+      font-size:18px;
+      color:var(--muted);
+      text-align:right;
+    }
+    .live-badge {
+      background: linear-gradient(90deg, #ff5b5f, #ff9b9b);
+      padding:8px 12px;
+      border-radius:999px;
+      font-weight:700;
+      box-shadow: 0 6px 18px rgba(255,77,79,0.14);
+    }
+
+    /* Middle panels: scoreboard details and feed */
+    .panels {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.01));
+      border-radius:10px;
+      padding:12px;
+      min-height:140px;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .card h4 {margin:0 0 8px 0; font-size:14px; color:var(--muted)}
+    .batter-list, .bowler-list {
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .player {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:6px 8px;
+      background: rgba(255,255,255,0.02);
+      border-radius:8px;
+      font-size:15px;
+    }
+    .player small {color:var(--muted); font-size:13px}
+
+    /* Right column (match summary / chart) */
+    .right {
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .match-info {
+      padding:12px;
+      border-radius:10px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .meta-row {display:flex; justify-content:space-between; gap:10px; font-size:14px; color:var(--muted); margin-bottom:6px;}
+
+    /* Ball-by-ball ticker */
+    .ball-feed {
+      height:120px;
+      overflow:hidden;
+      position:relative;
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+      border-radius:10px;
+      padding:10px;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .feed-inner {
+      position:absolute;
+      width:100%;
+      animation: scrollUp 12s linear infinite;
+    }
+    @keyframes scrollUp {
+      0% { transform: translateY(0); opacity:1 }
+      80% { opacity:1 }
+      100% { transform: translateY(-50%); opacity:1}
+    }
+    .feed-row { display:flex; justify-content:space-between; padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.02); }
+    .feed-row .left { font-weight:600 }
+    .feed-row .right { color:var(--muted) }
+
+    /* Bottom ticker */
+    .ticker {
+      margin-top:12px;
+      padding:8px 12px;
+      background: rgba(0,0,0,0.12);
+      border-radius:8px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,0.03);
+    }
+    .ticker p { 
+      display:inline-block;
+      white-space:nowrap;
+      animation: tickerMove 16s linear infinite;
+      color:var(--muted);
+      margin:0;
+    }
+    @keyframes tickerMove {
+      0% { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .tv { grid-template-columns: 1fr; }
+      .right { order:3 }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="tv" role="application" aria-label="Live Cricket TV Dashboard">
+
+    <!-- LEFT / MAIN -->
+    <div class="main">
+      <!-- Scoreboard top -->
+      <div class="scoreboard" aria-hidden="false">
+        <div class="teams">
+          <div class="team">
+            <div class="logo" id="logoA">RR</div>
+            <div>
+              <div class="abbr" id="teamA_name">Rajasthan Royals</div>
+              <div class="meta" id="teamA_meta">Batting</div>
+            </div>
+          </div>
+
+          <div style="width:18px"></div>
+
+          <div class="team">
+            <div class="logo" id="logoB">KKR</div>
+            <div>
+              <div class="abbr" id="teamB_name">Kolkata Knight Riders</div>
+              <div class="meta" id="teamB_meta">Bowling</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="score-big">
+          <div style="text-align:right">
+            <div class="runs" id="scoreA">165/5</div>
+            <div class="overs" id="oversA">19.4 overs</div>
+          </div>
+
+          <div style="width:26px"></div>
+
+          <div style="text-align:left">
+            <div style="font-weight:700; font-size:18px; color:var(--muted)">Target</div>
+            <div style="font-weight:800; font-size:28px; color:#fff" id="target">166</div>
+            <div class="overs" id="rr">RR: 8.42</div>
+          </div>
+
+          <div style="width:18px"></div>
+
+          <div class="live-badge"><i class="fa fa-broadcast-tower"></i> LIVE</div>
+        </div>
+      </div>
+
+      <!-- Mid panels: batters/bowlers -->
+      <div class="panels">
+        <div class="card">
+          <h4>Batters (Strike)</h4>
+          <div class="batter-list" id="batters">
+            <!-- players get injected -->
+            <div class="player"><div><strong>YJ Singh</strong><br><small>SR: 124.5</small></div><div><strong>34</strong></div></div>
+            <div class="player"><div><strong>SR Watson</strong><br><small>SR: 95.2</small></div><div><strong>12</strong></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h4>Bowlers</h4>
+          <div class="bowler-list" id="bowlers">
+            <div class="player"><div><strong>A Nortje</strong><br><small>O:4  M:0  R:28  W:2</small></div><div><strong>5.2</strong></div></div>
+            <div class="player"><div><strong>Varun</strong><br><small>O:3  M:0  R:25  W:1</small></div><div><strong>6.2</strong></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ball feed -->
+      <div class="ball-feed card" aria-live="polite">
+        <div class="feed-inner" id="feedInner">
+          <!-- Duplicate content to enable continuous scroll effect -->
+          <div id="feedRows">
+            <!-- rows are injected here -->
+            <div class="feed-row"><div class="left">18.6 - A Nortje to YJ Singh</div><div class="right">1 (single)</div></div>
+            <div class="feed-row"><div class="left">18.5 - A Nortje to SR Watson</div><div class="right">W (caught)</div></div>
+            <div class="feed-row"><div class="left">18.4 - A Nortje to SR Watson</div><div class="right">0</div></div>
+            <div class="feed-row"><div class="left">18.3 - A Nortje to SR Watson</div><div class="right">4 (boundary)</div></div>
+            <div class="feed-row"><div class="left">18.2 - Varun to SR Watson</div><div class="right">2</div></div>
+            <div class="feed-row"><div class="left">18.1 - Varun to SR Watson</div><div class="right">0</div></div>
+          </div>
+
+          <!-- copy for seamless scroll -->
+          <div id="feedRowsCopy" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <!-- Bottom ticker -->
+      <div class="ticker" aria-hidden="false">
+        <p id="bottomTicker">BREAKING: SR Watson suffers blow but continues. | Fall of wicket: 18.5 - SR Watson c Q de Kock b A Nortje | Toss Winner: KKR chose field.</p>
+      </div>
+    </div>
+
+    <!-- RIGHT column -->
+    <div class="right">
+      <div class="match-info card">
+        <div class="meta-row"><div>Venue</div><div id="venue">M Chinnaswamy Stadium</div></div>
+        <div class="meta-row"><div>Match</div><div id="matchType">League — Match 24</div></div>
+        <div class="meta-row"><div>Umpires</div><div id="umpires">Asad Rauf, RE Koertzen</div></div>
+        <div style="height:12px"></div>
+        <h4>Summary</h4>
+        <p style="color:var(--muted); margin:6px 0" id="summary">RR 165/5 (19.4) vs KKR — Chase in progress</p>
+      </div>
+
+      <div class="card">
+        <h4>Score Progression</h4>
+        <canvas id="scoreChart" style="width:100%; height:160px;"></canvas>
+      </div>
+
+      <div class="card">
+        <h4>Quick Controls (Dev)</h4>
+        <p style="color:var(--muted); font-size:13px">This is a demo. Replace the simulateUpdate() with WebSocket or server-sent events for real-time updates.</p>
+        <div style="display:flex; gap:8px; margin-top:10px">
+          <button id="btnAddRun" style="background:var(--accent); border:none; padding:8px 12px; border-radius:8px; color:#fff; cursor:pointer">+Run</button>
+          <button id="btnWicket" style="background:#444; border:none; padding:8px 12px; border-radius:8px; color:#fff; cursor:pointer">Wicket</button>
+          <button id="btnNextBall" style="background:#0b6; border:none; padding:8px 12px; border-radius:8px; color:#043">Next Ball</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // -------------------------
+  // Demo: client-side "live" updates
+  // Replace with your own API / WebSocket for real-time data.
+  // -------------------------
+
+  // basic match state (demo)
+  const state = {
+    teamA: { name: "Rajasthan Royals", abbrev: "RR", runs: 165, wickets: 5, overs: 19.4, rr: 8.42 },
+    teamB: { name: "Kolkata Knight Riders", abbrev: "KKR" },
+    target: 166,
+    batters: [
+      { name: "YJ Singh", runs: 34, balls: 26, sr: 130.7 },
+      { name: "SR Watson", runs: 12, balls: 13, sr: 92.3 }
+    ],
+    bowlers: [
+      { name: "A Nortje", overs: 4, runs: 28, wickets: 2 },
+      { name: "Varun", overs: 3, runs: 25, wickets: 1 }
+    ],
+    feed: [
+      "18.6 - A Nortje to YJ Singh — 1",
+      "18.5 - A Nortje to SR Watson — W (c Q de Kock)",
+      "18.4 - A Nortje to SR Watson — 0",
+      "18.3 - A Nortje to SR Watson — 4",
+      "18.2 - Varun to SR Watson — 2",
+    ],
+    progression: [0,2,4,6,9,12,15,20,25,30,36,40,45,50,58,68,78,90,102,124]
+  };
+
+  // DOM refs
+  const scoreA = document.getElementById("scoreA");
+  const oversA = document.getElementById("oversA");
+  const targetEl = document.getElementById("target");
+  const rrEl = document.getElementById("rr");
+  const battersEl = document.getElementById("batters");
+  const bowlersEl = document.getElementById("bowlers");
+  const feedRows = document.getElementById("feedRows");
+  const feedRowsCopy = document.getElementById("feedRowsCopy");
+  const feedInner = document.getElementById("feedInner");
+  const summary = document.getElementById("summary");
+  const bottomTicker = document.getElementById("bottomTicker");
+
+  // fill initial UI
+  function renderState(){
+    scoreA.textContent = `${state.teamA.runs}/${state.teamA.wickets}`;
+    oversA.textContent = `${state.teamA.overs} overs`;
+    targetEl.textContent = state.target;
+    rrEl.textContent = "RR: " + (state.teamA.rr).toFixed(2);
+
+    // batters
+    battersEl.innerHTML = "";
+    state.batters.forEach(b => {
+      const div = document.createElement("div");
+      div.className = "player";
+      div.innerHTML = `<div><strong>${b.name}</strong><br><small>SR: ${b.sr}</small></div><div><strong>${b.runs}</strong></div>`;
+      battersEl.appendChild(div);
+    });
+
+    // bowlers
+    bowlersEl.innerHTML = "";
+    state.bowlers.forEach(b => {
+      const div = document.createElement("div");
+      div.className = "player";
+      div.innerHTML = `<div><strong>${b.name}</strong><br><small>O:${b.overs}  R:${b.runs}  W:${b.wickets}</small></div><div><strong></strong></div>`;
+      bowlersEl.appendChild(div);
+    });
+
+    // feed
+    feedRows.innerHTML = "";
+    state.feed.forEach(row => {
+      const r = document.createElement("div");
+      r.className = "feed-row";
+      const parts = row.split("—");
+      r.innerHTML = `<div class="left">${parts[0].trim()}</div><div class="right">${parts[1] ? parts[1].trim() : ""}</div>`;
+      feedRows.appendChild(r);
+    });
+    // duplicate feed for seamless scroll
+    feedRowsCopy.innerHTML = feedRows.innerHTML;
+
+    // ticker summary
+    bottomTicker.textContent = `Live Update: ${state.feed[0]}  |  Score: ${state.teamA.runs}/${state.teamA.wickets} (${state.teamA.overs} overs)`;
+    summary.textContent = `${state.teamA.name} ${state.teamA.runs}/${state.teamA.wickets} (${state.teamA.overs}) vs ${state.teamB.name}`;
+  }
+
+  // Chart: score progression
+  const ctx = document.getElementById('scoreChart').getContext('2d');
+  const chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: state.progression.map((_,i)=>i+1),
+      datasets: [{
+        label: 'Runs',
+        data: state.progression,
+        fill: true,
+        tension: 0.3,
+        borderColor: '#ff9b9b',
+        backgroundColor: 'rgba(255,77,79,0.12)',
+        pointRadius: 0
+      }]
+    },
+    options: {
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{
+        x:{ display:false },
+        y:{ display:true, ticks:{ color: 'rgba(255,255,255,0.7)' } }
+      },
+      plugins: { legend: { display:false } }
+    }
+  });
+
+  // Simulate live updates every few seconds
+  function simulateUpdate(){
+    // random small update
+    const run = Math.random() < 0.15 ? 4 : (Math.random() < 0.3 ? 2 : (Math.random() < 0.45 ? 1 : 0));
+    state.teamA.runs += run;
+    // increment ball: convert overs like 19.4 to 19.5 etc.
+    let [ov, ball] = state.teamA.overs.toString().split(".");
+    ov = parseInt(ov);
+    ball = parseInt(ball || 0);
+    ball++;
+    if(ball >= 6){
+      ov += 1;
+      ball = 0;
+    }
+    state.teamA.overs = `${ov}.${ball}`;
+    // update rr
+    const totalBalls = ov*6 + ball;
+    state.teamA.rr = (state.teamA.runs / Math.max(1, totalBalls)) * 6;
+
+    // feed push
+    const newEvent = `${state.teamA.overs} - A Nortje to ${state.batters[0].name} — ${run === 0 ? '0' : run}`;
+    state.feed.unshift(newEvent);
+    if(state.feed.length>20) state.feed.pop();
+
+    // progression push
+    state.progression.push(state.teamA.runs);
+    if(state.progression.length>40) state.progression.shift();
+
+    // update chart
+    chart.data.labels = state.progression.map((_,i)=>i+1);
+    chart.data.datasets[0].data = state.progression;
+    chart.update();
+
+    renderState();
+  }
+
+  // UI controls demo
+  document.getElementById("btnAddRun").addEventListener("click", ()=>{ 
+    state.teamA.runs += 1; simulateUpdate(); 
+  });
+  document.getElementById("btnWicket").addEventListener("click", ()=>{ 
+    state.teamA.wickets += 1; 
+    state.feed.unshift(`${state.teamA.overs} - A Nortje to ${state.batters[0].name} — W (caught)`); 
+    renderState();
+  });
+  document.getElementById("btnNextBall").addEventListener("click", ()=> simulateUpdate() );
+
+  // Start auto updates
+  renderState();
+  setInterval(simulateUpdate, 5000); // every 5 seconds simulate
+
+  // For better accessibility / motion preferences:
+  // You can pause animations when user prefers reduced motion in CSS or JS.
+
+</script>
+</body>
+</html>
